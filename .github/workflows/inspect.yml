@@ -45,7 +45,7 @@ jobs:
 
       - name: Setup pnpm
         # pnpm/action-setup@v4.1.0
-        uses: pnpm/action-setup@a7487ba4cd02ee39c32e273f85d63cf5b9de20c4
+        uses: pnpm/action-setup@7088e561eb65bb68695d245aa206f005ef30921d
         with:
           version: 10
 
