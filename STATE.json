@@ -1,0 +1,25 @@
+{
+  "last_analyzed_sha": null,
+  "last_run_at": null,
+  "run_count": 0,
+  "cosmic_suggestions": [],
+  "hit_rate": null,
+  "total_created": 0,
+  "total_accepted": 0,
+  "total_rejected": 0,
+  "external_modifications": [],
+  "convergence_patterns": [],
+  "divergence_patterns": [],
+  "threshold_stats": {
+    "current_threshold": 7,
+    "consecutive_skips": 0,
+    "consecutive_full_runs": 0,
+    "last_adjusted_at": null,
+    "adjustment_history": []
+  },
+  "patterns": {
+    "accepted_topics": [],
+    "rejected_topics": [],
+    "external_hot_topics": []
+  }
+}

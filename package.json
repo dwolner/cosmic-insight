@@ -1,0 +1,28 @@
+{
+  "name": "cosmic-insight",
+  "version": "1.0.0",
+  "description": "A consciousness-expanding code analysis agent for yoyo-evolve",
+  "main": "dist/inspect.js",
+  "scripts": {
+    "build": "tsc",
+    "inspect": "tsx src/inspect.ts",
+    "inspect:dry": "DRY_RUN=true tsx src/inspect.ts",
+    "status": "tsx src/status.ts",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src/**/*.ts",
+    "test": "node --test dist/inspect.test.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "packageManager": "pnpm@10.31.0",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.78.0",
+    "dotenv": "^17.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.0.0",
+    "typescript": "^5.0.0"
+  }
+}

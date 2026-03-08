@@ -1,0 +1,121 @@
+name: Cosmic Insight
+
+on:
+  schedule:
+    # 2, 10, 18 UTC — offset 2h after yoyo-evolve (0, 4, 8, 12, 16, 20 UTC)
+    - cron: "0 2,10,18 * * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run (print issues, do not create them)"
+        required: false
+        default: "true"
+        type: choice
+        options:
+          - "true"
+          - "false"
+
+permissions:
+  contents: write  # needed to commit STATE.json, JOURNAL.md, PRIORITIES.md
+  issues: write    # needed to open self-issues when Cosmic needs help
+
+# Prevent parallel runs — a racing scheduled + manual trigger could double-post
+concurrency:
+  group: cosmic-insight-run
+  cancel-in-progress: false  # let the in-flight run finish, queue is fine
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout cosmic-insight
+        # pinned to SHA — immune to tag-hijacking supply chain attacks
+        # actions/checkout@v4.2.2
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node.js
+        # actions/setup-node@v4.4.0
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: "22"
+
+      - name: Setup pnpm
+        # pnpm/action-setup@v4.1.0
+        uses: pnpm/action-setup@a7487ba4cd02ee39c32e273f85d63cf5b9de20c4
+        with:
+          version: 10
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run Cosmic Insight
+        id: run
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          YOYO_GH_TOKEN: ${{ secrets.YOYO_GH_TOKEN }}
+          DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
+        run: bash scripts/inspect.sh
+
+      - name: Verify issue count (circuit breaker)
+        if: success()
+        env:
+          GH_TOKEN: ${{ secrets.YOYO_GH_TOKEN }}
+        run: |
+          # Count Cosmic's open issues on yoyo-evolve right now
+          OPEN=$(gh issue list --repo yologdev/yoyo-evolve --label agent-input --state open --json title --jq '[.[] | select(.title | startswith("[Cosmic Insight]"))] | length')
+          echo "Open Cosmic issues on yoyo-evolve: $OPEN"
+          if [ "$OPEN" -gt 10 ]; then
+            echo "CIRCUIT BREAKER: $OPEN open issues exceeds safety limit of 10. Marking run as failed."
+            exit 1
+          fi
+
+      - name: Print status
+        if: always()
+        run: pnpm status
+
+      - name: Alert — threshold at floor
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          THRESHOLD=$(node -e "const s=require('./STATE.json'); console.log(s.threshold_stats.current_threshold)")
+          SKIPS=$(node -e "const s=require('./STATE.json'); console.log(s.threshold_stats.consecutive_skips)")
+          if [ "$THRESHOLD" -le 5 ] && [ "$SKIPS" -ge 3 ]; then
+            gh issue create \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "[Cosmic Insight] needs attention — threshold floored, still silent" \
+              --body "Cosmic Insight's adaptive threshold has hit the floor (5/10) and has been silent for ${SKIPS} consecutive runs. Either yoyo has no gaps worth flagging, or the analysis needs recalibration. Please review STATE.json and JOURNAL.md." \
+              --label "needs-attention" || true
+          fi
+
+      - name: Alert — hit rate critical
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TOTAL=$(node -e "const s=require('./STATE.json'); console.log(s.total_created)")
+          ACCEPTED=$(node -e "const s=require('./STATE.json'); console.log(s.total_accepted)")
+          REJECTED=$(node -e "const s=require('./STATE.json'); console.log(s.total_rejected)")
+          RESOLVED=$((ACCEPTED + REJECTED))
+          if [ "$RESOLVED" -ge 4 ] && [ "$ACCEPTED" -lt 1 ]; then
+            gh issue create \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "[Cosmic Insight] hit rate critical — 0 of ${RESOLVED} suggestions accepted" \
+              --body "Cosmic Insight's suggestions are being consistently rejected. Hit rate: 0%. This suggests the analysis is missing the mark. Review JOURNAL.md and convergence/divergence patterns in STATE.json." \
+              --label "needs-attention" || true
+          fi
+
+      - name: Notify on failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh issue create \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "[Cosmic Insight] run failed — $(date -u +%Y-%m-%d)" \
+            --body "The scheduled Cosmic Insight run failed. Check the [Actions log]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID) for details." \
+            --label "needs-attention" || true
