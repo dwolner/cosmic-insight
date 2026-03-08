@@ -82,6 +82,7 @@ interface Suggestion {
   observation: string;
   suggestion: string;
   reasoning: string;
+  example: string;
   topics: string[];
   priority_score: number;
 }
@@ -247,26 +248,23 @@ function formatIssueBody(suggestion: Suggestion, state: State, sha: string): str
     ? `${Math.round(state.hit_rate * 100)}% (${state.total_accepted}/${state.total_created} suggestions accepted)`
     : "no data yet (first run)";
 
-  return `## Observation
+  return `**What should the agent learn or improve?**
 
 ${suggestion.observation}
 
-## Suggestion
-
 ${suggestion.suggestion}
 
-## Reasoning
+**Why does this matter?**
 
 ${suggestion.reasoning}
 
-## Context
+**Example of how it should work:**
 
-- Inspector run: Day ${state.run_count + 1}, ${new Date().toISOString()}
-- Analyzing commit: ${sha.slice(0, 8)}
-- Hit rate: ${hitRateStr}
+${suggestion.example}
 
 ---
-*Stay cosmic* ✌️ — [Cosmic Insight](https://github.com/dwolner/cosmic-insight)`;
+*Cosmic Insight — Day ${state.run_count + 1}, commit ${sha.slice(0, 8)}, hit rate: ${hitRateStr}*
+[Cosmic Insight](https://github.com/dwolner/cosmic-insight) ✌️`;
 }
 
 // ---------------------------------------------------------------------------
@@ -351,6 +349,7 @@ Return a JSON object with this exact shape:
       "observation": "what you noticed — specific, technical, with file/line references where possible",
       "suggestion": "what yoyo could do — approach, not implementation",
       "reasoning": "why this matters for yoyo's growth, tied to its mission",
+      "example": "a concrete scenario showing what the ideal behavior looks like — e.g. 'User runs yoyo, types a shell command, yoyo pauses and shows: Allow execute ls -la? (y/n) before firing'",
       "topics": ["topic1", "topic2"],
       "priority_score": 8
     }
