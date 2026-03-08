@@ -146,6 +146,10 @@ Cosmic opens issues **on this repo** (not yoyo-evolve) when it needs attention:
 
 Watch this repo's Issues with notifications enabled to get emailed.
 
+## Voice tuning
+
+The Cosmic voice is injected into Haiku via a full example suggestion in the prompt (not just a style rule). The prompt includes a complete observation/suggestion/reasoning in the correct voice so Haiku can pattern-match the tone at paragraph length. If the voice ever drifts flat, update the example in `buildPrompt()` in [src/inspect.ts](src/inspect.ts).
+
 ## Security
 
 ### Kill switch
