@@ -184,7 +184,7 @@ function readYoyoFile(relativePath: string): string {
 function getOpenInspectorIssues(): { count: number; titles: string[] } {
   try {
     const out = run(
-      `gh issue list --repo yologdev/yoyo-evolve --label agent-input --state open --json number,title --jq '[.[] | select(.title | startswith("[Cosmic Insight]"))]'`
+      `gh issue list --repo yologdev/yoyo-evolve --state open --json number,title --jq '[.[] | select(.title | startswith("[Cosmic Insight]"))]'`
     );
     const issues: { number: number; title: string }[] = JSON.parse(out);
     return { count: issues.length, titles: issues.map((i) => i.title) };
@@ -196,7 +196,7 @@ function getOpenInspectorIssues(): { count: number; titles: string[] } {
 function getRecentClosedIssues(): CosmicSuggestion[] {
   try {
     const out = run(
-      `gh issue list --repo yologdev/yoyo-evolve --label agent-input --state closed --json number,title,closedAt,stateReason --limit 20`
+      `gh issue list --repo yologdev/yoyo-evolve --state closed --json number,title,closedAt,stateReason --limit 20 --jq '[.[] | select(.title | startswith("[Cosmic Insight]"))]'`
     );
     return JSON.parse(out).map((i: { number: number; title: string; closedAt: string; stateReason: string }) => ({
       number: i.number,
@@ -229,8 +229,11 @@ function createIssue(suggestion: Suggestion, state: State, sha: string): number 
   const bodyFile = join(tmpDir, "body.md");
   try {
     writeFileSync(bodyFile, body, "utf8");
+    // Note: --label agent-input is omitted — adding labels to another user's repo
+    // requires collaborator/triage access which the fine-grained PAT doesn't grant.
+    // Labels must be added manually or by yoyo-evolve's owner granting collaborator access.
     const result = run(
-      `gh issue create --repo yologdev/yoyo-evolve --title ${JSON.stringify(title)} --body-file ${JSON.stringify(bodyFile)} --label agent-input`
+      `gh issue create --repo yologdev/yoyo-evolve --title ${JSON.stringify(title)} --body-file ${JSON.stringify(bodyFile)}`
     );
     const match = result.match(/\/issues\/(\d+)/);
     return match ? parseInt(match[1], 10) : null;

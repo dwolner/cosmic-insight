@@ -64,7 +64,7 @@ jobs:
           GH_TOKEN: ${{ secrets.YOYO_GH_TOKEN }}
         run: |
           # Count Cosmic's open issues on yoyo-evolve right now
-          OPEN=$(gh issue list --repo yologdev/yoyo-evolve --label agent-input --state open --json title --jq '[.[] | select(.title | startswith("[Cosmic Insight]"))] | length')
+          OPEN=$(gh issue list --repo yologdev/yoyo-evolve --state open --json title --jq '[.[] | select(.title | startswith("[Cosmic Insight]"))] | length')
           echo "Open Cosmic issues on yoyo-evolve: $OPEN"
           if [ "$OPEN" -gt 10 ]; then
             echo "CIRCUIT BREAKER: $OPEN open issues exceeds safety limit of 10. Marking run as failed."
