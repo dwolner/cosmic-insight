@@ -1,8 +1,9 @@
 import "dotenv/config";
 import Anthropic from "@anthropic-ai/sdk";
 import { execSync } from "child_process";
-import { readFileSync, writeFileSync } from "fs";
+import { readFileSync, writeFileSync, mkdtempSync, rmSync } from "fs";
 import { join } from "path";
+import { tmpdir } from "os";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -222,11 +223,20 @@ function createIssue(suggestion: Suggestion, state: State, sha: string): number 
     return null;
   }
 
-  const result = run(
-    `gh issue create --repo yologdev/yoyo-evolve --title ${JSON.stringify(title)} --body ${JSON.stringify(body)} --label agent-input`
-  );
-  const match = result.match(/\/issues\/(\d+)/);
-  return match ? parseInt(match[1], 10) : null;
+  // Write body to a temp file to avoid shell escaping issues with backticks,
+  // dollar signs, and single quotes that gh issue create --body can't handle.
+  const tmpDir = mkdtempSync(join(tmpdir(), "cosmic-"));
+  const bodyFile = join(tmpDir, "body.md");
+  try {
+    writeFileSync(bodyFile, body, "utf8");
+    const result = run(
+      `gh issue create --repo yologdev/yoyo-evolve --title ${JSON.stringify(title)} --body-file ${JSON.stringify(bodyFile)} --label agent-input`
+    );
+    const match = result.match(/\/issues\/(\d+)/);
+    return match ? parseInt(match[1], 10) : null;
+  } finally {
+    rmSync(tmpDir, { recursive: true, force: true });
+  }
 }
 
 function formatIssueBody(suggestion: Suggestion, state: State, sha: string): string {
