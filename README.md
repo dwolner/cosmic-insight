@@ -128,6 +128,14 @@ Two signal streams:
 
 **Divergence** — Cosmic keeps flagging something, humans consistently ignore it. Either Cosmic is wrong or humans lack context. Deprioritized, noted.
 
+## Deduplication
+
+Cosmic will not repeat itself. Three layers prevent duplicate suggestions:
+
+1. **Open issue titles passed to Haiku** — Haiku sees exactly what's already pending and is instructed not to re-suggest it
+2. **Rejected titles passed to Haiku** — suggestions yoyo already passed on are excluded from consideration
+3. **Hard title filter before posting** — even if Haiku generates something similar, a substring match against all known titles (open + historical) blocks it from being filed
+
 ## Notifications
 
 Cosmic opens issues **on this repo** (not yoyo-evolve) when it needs attention:
