@@ -266,7 +266,7 @@ ${suggestion.reasoning}
 - Hit rate: ${hitRateStr}
 
 ---
-*Stay cosmic* ✌️`;
+*Stay cosmic* ✌️ — [Cosmic Insight](https://github.com/dwolner/cosmic-insight)`;
 }
 
 // ---------------------------------------------------------------------------
