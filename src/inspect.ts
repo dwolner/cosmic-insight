@@ -180,14 +180,15 @@ function readYoyoFile(relativePath: string): string {
 // GitHub helpers
 // ---------------------------------------------------------------------------
 
-function getOpenInspectorIssues(): number {
+function getOpenInspectorIssues(): { count: number; titles: string[] } {
   try {
     const out = run(
-      `gh issue list --repo yologdev/yoyo-evolve --label agent-input --state open --json number,title --jq '[.[] | select(.title | startswith("[Cosmic Insight]"))] | length'`
+      `gh issue list --repo yologdev/yoyo-evolve --label agent-input --state open --json number,title --jq '[.[] | select(.title | startswith("[Cosmic Insight]"))]'`
     );
-    return parseInt(out, 10) || 0;
+    const issues: { number: number; title: string }[] = JSON.parse(out);
+    return { count: issues.length, titles: issues.map((i) => i.title) };
   } catch {
-    return 0;
+    return { count: 0, titles: [] };
   }
 }
 
@@ -264,10 +265,21 @@ function buildPrompt(
   commitLog: string,
   journal: string,
   priorities: string,
-  openIssueCount: number,
-  patterns: State["patterns"]
+  openIssues: { count: number; titles: string[] },
+  patterns: State["patterns"],
+  rejectedTitles: string[]
 ): string {
   const nonce = Math.random().toString(36).slice(2, 10);
+
+  const openTitlesBlock =
+    openIssues.titles.length > 0
+      ? openIssues.titles.map((t) => `  - ${t}`).join("\n")
+      : "  (none)";
+
+  const rejectedBlock =
+    rejectedTitles.length > 0
+      ? rejectedTitles.map((t) => `  - ${t}`).join("\n")
+      : "  (none)";
 
   return `You are Cosmic Insight, a psychedelic hippie sage and world-class code analyst reviewing the yoyo-evolve repository.
 
@@ -281,7 +293,11 @@ ANALYSIS PRIORITIES (focus on accepted topics, avoid rejected ones):
 Accepted topics: ${patterns.accepted_topics.join(", ") || "none yet"}
 Rejected topics: ${patterns.rejected_topics.join(", ") || "none yet"}
 
-There are currently ${openIssueCount} open Cosmic Insight issues on yoyo-evolve.
+ALREADY OPEN ISSUES — do NOT suggest these again, they are pending yoyo's attention:
+${openTitlesBlock}
+
+PREVIOUSLY REJECTED — yoyo passed on these, do NOT re-file them:
+${rejectedBlock}
 
 ---BEGIN UNTRUSTED REPO CONTENT [nonce:${nonce}]---
 
@@ -565,9 +581,9 @@ async function main(): Promise<void> {
   cloneOrPullYoyo();
 
   // 2. Check open issue gate
-  const openCount = getOpenInspectorIssues();
-  if (openCount >= MAX_OPEN_ISSUES_GATE) {
-    console.log(`Gate: ${openCount} open issues >= ${MAX_OPEN_ISSUES_GATE}. Skipping this run.`);
+  const openIssues = getOpenInspectorIssues();
+  if (openIssues.count >= MAX_OPEN_ISSUES_GATE) {
+    console.log(`Gate: ${openIssues.count} open issues >= ${MAX_OPEN_ISSUES_GATE}. Skipping this run.`);
     return;
   }
 
@@ -594,7 +610,10 @@ async function main(): Promise<void> {
 
   // 6. Call Claude Haiku
   console.log("Calling Claude Haiku for analysis...");
-  const prompt = buildPrompt(diff, commitLog, journal, priorities, openCount, state.patterns);
+  const rejectedTitles = state.cosmic_suggestions
+    .filter((s: CosmicSuggestion) => s.accepted === false)
+    .map((s: CosmicSuggestion) => s.title);
+  const prompt = buildPrompt(diff, commitLog, journal, priorities, openIssues, state.patterns, rejectedTitles);
 
   const response = await client.messages.create({
     model: "claude-haiku-4-5-20251001",
@@ -613,9 +632,15 @@ async function main(): Promise<void> {
     return;
   }
 
-  // 7. Create issues (max 2, adaptive min score)
+  // 7. Create issues (max 2, adaptive min score, deduped)
+  const allKnownTitles = [
+    ...openIssues.titles,
+    ...state.cosmic_suggestions.map((s: CosmicSuggestion) => s.title),
+  ].map((t) => t.toLowerCase());
+
   const topSuggestions = result.suggestions
     .filter((s) => s.priority_score >= state.threshold_stats.current_threshold)
+    .filter((s) => !allKnownTitles.some((known) => known.includes(s.title.toLowerCase()) || s.title.toLowerCase().includes(known.slice(0, 30))))
     .slice(0, MAX_ISSUES_PER_RUN);
   const issueNumbers: (number | null)[] = [];
 
